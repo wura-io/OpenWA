@@ -2,6 +2,8 @@ import { Module, DynamicModule, Type } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import configuration from './config/configuration';
 import { SessionModule } from './modules/session/session.module';
 import { MessageModule } from './modules/message/message.module';
@@ -37,6 +39,22 @@ if (process.env.QUEUE_ENABLED === 'true') {
   queueModules.push(queueModule.QueueModule);
 }
 
+// Serve the prebuilt Dashboard SPA only in production. In development the
+// dashboard runs via the Vite dev server (port 2886) which proxies /api here.
+// The Dockerfile builds the SPA and copies it to /app/public (../public at
+// runtime, since the compiled app lives in /app/dist).
+const staticModules: Array<Type | DynamicModule> = [];
+if (process.env.NODE_ENV === 'production') {
+  staticModules.push(
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+      // Let the API (global prefix `api`) and Socket.IO handle their own routes;
+      // everything else falls through to the SPA's index.html.
+      exclude: ['/api/{*path}', '/socket.io/{*path}'],
+    }),
+  );
+}
+
 @Module({
   imports: [
     // Configuration
@@ -44,6 +62,9 @@ if (process.env.QUEUE_ENABLED === 'true') {
       isGlobal: true,
       load: [configuration],
     }),
+
+    // Dashboard SPA (production only)
+    ...staticModules,
 
     // Main Database (always SQLite - boot config)
     TypeOrmModule.forRootAsync({

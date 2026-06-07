@@ -55,7 +55,11 @@ export class AuthService implements OnModuleInit {
 
     // Always show the welcome banner on startup
     const apiBaseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 2785}`;
-    const dashboardUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.DASHBOARD_PORT || 2886}`;
+    // In production the dashboard SPA is served by this same NestJS process
+    // (ServeStaticModule). In dev it runs on the Vite dev server.
+    const dashboardUrl =
+      process.env.DASHBOARD_URL ||
+      (process.env.NODE_ENV === 'production' ? apiBaseUrl : `http://localhost:${process.env.DASHBOARD_PORT || 2886}`);
 
     this.logger.log('');
     this.logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

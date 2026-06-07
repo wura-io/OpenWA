@@ -22,8 +22,13 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the NestJS application -> /app/dist
 RUN npm run build
+
+# Build the Dashboard SPA -> /app/dashboard/dist
+# (root npm ci skipped the dashboard postinstall because the dir wasn't
+#  copied yet, so install its deps explicitly here)
+RUN cd dashboard && npm ci && npm run build
 
 # ===== Stage 2: Production =====
 FROM node:22-slim AS production
@@ -69,6 +74,14 @@ RUN npm ci --omit=dev && npm cache clean --force
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Copy built Dashboard SPA; served by NestJS ServeStaticModule in production
+COPY --from=builder /app/dashboard/dist ./public
+
+# Serve the dashboard from NestJS in production (app.module gates on NODE_ENV).
+# Default for tooling; the start command below hard-forces it so an --env-file
+# or -e cannot accidentally flip the image back to development.
+ENV NODE_ENV=production
+
 # Create data directories with proper permissions
 RUN mkdir -p ./data/sessions ./data/media && \
     chown -R openwa:openwa /app
@@ -84,6 +97,8 @@ EXPOSE 2785
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD node -e "require('http').get('http://localhost:2785/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
-# Start with dumb-init to handle signals properly
+# Start with dumb-init to handle signals properly.
+# NODE_ENV is forced to production inline so it wins over any inherited env
+# (--env-file / -e); `exec` keeps node as PID and preserves signal handling.
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/main"]
+CMD ["sh", "-c", "NODE_ENV=production exec node dist/main"]
