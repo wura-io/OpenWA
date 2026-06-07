@@ -11,10 +11,13 @@ import {
   Webhook as WebhookIcon,
   Check,
   AlertTriangle,
+  RefreshCw,
+  Copy,
 } from 'lucide-react';
 import { webhookApi, type Webhook } from '../services/api';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useRole } from '../hooks/useRole';
+import { useWebhookSecret } from '../hooks/useWebhookSecret';
 import {
   useWebhooksQuery,
   useSessionsQuery,
@@ -34,10 +37,17 @@ const availableEventNames = [
   '*',
 ] as const;
 
+// Show a hint of the secret (prefix + first chars) and mask the rest.
+const maskSecret = (secret: string) => {
+  if (secret.length <= 10) return '••••••••';
+  return `${secret.slice(0, 10)}${'•'.repeat(Math.min(secret.length - 10, 24))}`;
+};
+
 export function Webhooks() {
   const { t } = useTranslation();
   useDocumentTitle(t('webhooks.title'));
   const { canWrite } = useRole();
+  const { generate: generateSecret } = useWebhookSecret();
   const { data: webhooks = [], isLoading: loadingWebhooks } = useWebhooksQuery();
   const { data: sessions = [] } = useSessionsQuery();
   const loading = loadingWebhooks;
@@ -49,7 +59,8 @@ export function Webhooks() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ sessionId: string; id: string; url: string } | null>(null);
   const [editWebhook, setEditWebhook] = useState<Webhook | null>(null);
-  const [newWebhook, setNewWebhook] = useState({ url: '', events: ['message.received'], sessionId: '' });
+  const [newWebhook, setNewWebhook] = useState({ url: '', events: ['message.received'], sessionId: '', secret: '' });
+  const [secretCopied, setSecretCopied] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -72,9 +83,11 @@ export function Webhooks() {
         sessionId: newWebhook.sessionId,
         url: newWebhook.url,
         events: newWebhook.events,
+        // Only send a secret when provided; empty string leaves it unset.
+        ...(newWebhook.secret ? { secret: newWebhook.secret } : {}),
       });
       setShowCreateModal(false);
-      setNewWebhook({ url: '', events: ['message.received'], sessionId: '' });
+      setNewWebhook({ url: '', events: ['message.received'], sessionId: '', secret: '' });
       setToast({ type: 'success', message: t('webhooks.toasts.created') });
     } catch (err) {
       setToast({
@@ -134,7 +147,15 @@ export function Webhooks() {
 
   const openEdit = (webhook: Webhook) => {
     setEditWebhook({ ...webhook });
+    setSecretCopied(false);
     setShowEditModal(true);
+  };
+
+  const copySecret = async () => {
+    if (!editWebhook?.secret) return;
+    await navigator.clipboard.writeText(editWebhook.secret);
+    setSecretCopied(true);
+    setTimeout(() => setSecretCopied(false), 2000);
   };
 
   const handleEdit = async () => {
@@ -143,7 +164,12 @@ export function Webhooks() {
       await updateMutation.mutateAsync({
         sessionId: editWebhook.sessionId,
         id: editWebhook.id,
-        data: { url: editWebhook.url, events: editWebhook.events, active: editWebhook.active },
+        data: {
+          url: editWebhook.url,
+          events: editWebhook.events,
+          active: editWebhook.active,
+          // Secret is immutable here — to rotate it, delete and recreate the webhook.
+        },
       });
       setShowEditModal(false);
       setEditWebhook(null);
@@ -240,6 +266,24 @@ export function Webhooks() {
                 value={newWebhook.url}
                 onChange={e => setNewWebhook({ ...newWebhook, url: e.target.value })}
               />
+              <label>{t('webhooks.secret', { defaultValue: 'Secret (HMAC signature)' })}</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  placeholder={t('webhooks.secretPlaceholder', { defaultValue: 'Optional — enables X-OpenWA-Signature' })}
+                  value={newWebhook.secret}
+                  onChange={e => setNewWebhook({ ...newWebhook, secret: e.target.value })}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  title={t('webhooks.generateSecret', { defaultValue: 'Generate secret' })}
+                  onClick={() => setNewWebhook(prev => ({ ...prev, secret: generateSecret() }))}
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
               <label>{t('webhooks.events')}</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 {availableEventNames.map(name => (
@@ -282,6 +326,36 @@ export function Webhooks() {
                 value={editWebhook.url}
                 onChange={e => setEditWebhook({ ...editWebhook, url: e.target.value })}
               />
+              <label>{t('webhooks.secret', { defaultValue: 'Secret (HMAC signature)' })}</label>
+              {editWebhook.secret ? (
+                <>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      value={maskSecret(editWebhook.secret)}
+                      readOnly
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      title={t('common.copy', { defaultValue: 'Copy' })}
+                      onClick={copySecret}
+                    >
+                      {secretCopied ? <Check size={16} /> : <Copy size={16} />}
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>
+                    {t('webhooks.secretImmutableHint', {
+                      defaultValue: 'To rotate the secret, delete this webhook and create a new one.',
+                    })}
+                  </p>
+                </>
+              ) : (
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                  {t('webhooks.noSecret', { defaultValue: 'No secret configured.' })}
+                </p>
+              )}
               <label>{t('webhooks.events')}</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                 {availableEventNames.map(name => (
