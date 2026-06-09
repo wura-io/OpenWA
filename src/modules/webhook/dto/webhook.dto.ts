@@ -61,6 +61,19 @@ export class CreateWebhookDto {
   @Min(0)
   @Max(5)
   retryCount?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Allowlist of chat/contact ids. When set, message.* events are only delivered ' +
+      'if the message from or author matches. Empty/omitted = receive from all chats. ' +
+      'Use @c.us ids for users and @g.us ids for groups.',
+    example: ['628111@c.us', '120363222@g.us'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  chatFilter?: string[];
 }
 
 export class UpdateWebhookDto {
@@ -94,6 +107,17 @@ export class UpdateWebhookDto {
   @Min(0)
   @Max(5)
   retryCount?: number;
+
+  @ApiPropertyOptional({
+    description: 'Allowlist of chat/contact ids for message.* events. Pass [] or null to clear.',
+    example: ['628111@c.us', '120363222@g.us'],
+    type: [String],
+    nullable: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  chatFilter?: string[] | null;
 }
 
 export class WebhookResponseDto {
@@ -108,6 +132,9 @@ export class WebhookResponseDto {
 
   @ApiProperty()
   events: string[];
+
+  @ApiPropertyOptional({ type: [String], nullable: true })
+  chatFilter?: string[] | null;
 
   @ApiProperty()
   active: boolean;

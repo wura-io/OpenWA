@@ -35,6 +35,14 @@ export class Webhook {
   @Column({ type: jsonColumnType(), default: '{}' })
   headers: Record<string, string>;
 
+  /**
+   * Allowlist of chat/contact ids (e.g. "628xxx@c.us", "120363xxx@g.us").
+   * When non-empty, message.* events are only delivered if the message's
+   * `from` or `author` matches an entry. Empty/null = receive all (default).
+   */
+  @Column({ type: jsonColumnType(), nullable: true })
+  chatFilter: string[] | null;
+
   @Column({ type: 'boolean', default: true })
   active: boolean;
 

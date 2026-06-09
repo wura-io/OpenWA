@@ -57,6 +57,7 @@ export class WebhookService {
       secret: dto.secret || null,
       headers: dto.headers || {},
       retryCount: dto.retryCount ?? 3,
+      chatFilter: dto.chatFilter?.length ? dto.chatFilter : null,
     });
 
     return this.webhookRepository.save(webhook);
@@ -92,6 +93,7 @@ export class WebhookService {
     if (dto.headers !== undefined) webhook.headers = dto.headers;
     if (dto.active !== undefined) webhook.active = dto.active;
     if (dto.retryCount !== undefined) webhook.retryCount = dto.retryCount;
+    if (dto.chatFilter !== undefined) webhook.chatFilter = dto.chatFilter?.length ? dto.chatFilter : null;
 
     return this.webhookRepository.save(webhook);
   }
@@ -157,7 +159,9 @@ export class WebhookService {
       where: { sessionId, active: true },
     });
 
-    const matchingWebhooks = webhooks.filter(w => w.events.includes(event) || w.events.includes('*'));
+    const matchingWebhooks = webhooks.filter(
+      w => (w.events.includes(event) || w.events.includes('*')) && this.matchesChatFilter(w, event, data),
+    );
 
     // Generate idempotency key (same for all webhooks receiving this event)
     const idempotencyKey = generateIdempotencyKey(event, { ...data, sessionId });
@@ -351,6 +355,38 @@ export class WebhookService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Per-webhook contact/group filtering. Only applies to message.* events,
+   * which carry `from` (chat id) and `author` (real sender inside a group).
+   * A webhook with an empty/null `chatFilter` receives everything (default).
+   * Non-message events (session.*, group.*, etc.) always pass.
+   */
+  private matchesChatFilter(webhook: Webhook, event: string, data: Record<string, unknown>): boolean {
+    const filter = webhook.chatFilter;
+    if (!filter || filter.length === 0) {
+      return true;
+    }
+    if (!event.startsWith('message.')) {
+      return true;
+    }
+
+    const allowed = new Set(filter);
+    const from = typeof data.from === 'string' ? data.from : undefined;
+    const author = typeof data.author === 'string' ? data.author : undefined;
+
+    const match = (from !== undefined && allowed.has(from)) || (author !== undefined && allowed.has(author));
+
+    if (!match) {
+      this.logger.debug(`Webhook ${webhook.id} skipped: ${from ?? author ?? 'unknown'} not in chat filter`, {
+        webhookId: webhook.id,
+        event,
+        action: 'webhook_chat_filtered',
+      });
+    }
+
+    return match;
   }
 
   private generateSignature(payload: string, secret: string): string {

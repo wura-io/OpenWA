@@ -190,6 +190,80 @@
   border-color: var(--primary);
 }
 
+/* Filtered indicator in the webhooks table */
+.events-cell .chat-filter-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: rgba(37, 211, 102, 0.18);
+  cursor: help;
+}
+
+/* Chat filter chip input (webhooks modals) */
+.chat-filter-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-filter-input-row input {
+  flex: 1;
+}
+
+.chat-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.chat-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.5rem 0.375rem 0.75rem;
+  background: rgba(37, 211, 102, 0.12);
+  color: var(--primary);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chat-filter-chip code {
+  background: none;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: inherit;
+}
+
+.chat-filter-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.2s;
+}
+
+.chat-filter-chip button:hover {
+  opacity: 1;
+  background: rgba(37, 211, 102, 0.2);
+}
+
+.chat-filter-empty {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;

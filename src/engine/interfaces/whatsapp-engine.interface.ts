@@ -25,6 +25,11 @@ export interface MediaInput {
 export interface IncomingMessage {
   id: string;
   from: string;
+  /**
+   * Real sender inside a group (participant id, e.g. "628xxx@c.us"). Undefined
+   * for 1:1 chats where `from` is already the sender. Mirrors wwebjs msg.author.
+   */
+  author?: string;
   to: string;
   chatId: string;
   body: string;

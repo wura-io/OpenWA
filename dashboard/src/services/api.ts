@@ -48,6 +48,8 @@ export interface Webhook {
   events: string[];
   active: boolean;
   secret?: string;
+  /** Allowlist of chat/contact ids; empty/null delivers message events from all chats. */
+  chatFilter?: string[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -249,7 +251,7 @@ export const webhookApi = {
   listBySession: (sessionId: string) => request<Webhook[]>(`/sessions/${sessionId}/webhooks`),
   listAll: () => request<Webhook[]>('/webhooks'),
   get: (sessionId: string, id: string) => request<Webhook>(`/sessions/${sessionId}/webhooks/${id}`),
-  create: (sessionId: string, data: { url: string; events: string[]; secret?: string }) =>
+  create: (sessionId: string, data: { url: string; events: string[]; secret?: string; chatFilter?: string[] }) =>
     request<Webhook>(`/sessions/${sessionId}/webhooks`, {
       method: 'POST',
       body: JSON.stringify(data),

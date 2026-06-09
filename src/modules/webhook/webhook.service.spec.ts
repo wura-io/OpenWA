@@ -19,6 +19,7 @@ function createMockWebhook(overrides: Partial<Webhook> = {}): Webhook {
     events: ['message.received'],
     secret: null,
     headers: {},
+    chatFilter: null,
     active: true,
     retryCount: 3,
     lastTriggeredAt: null,
@@ -282,6 +283,104 @@ describe('WebhookService', () => {
       await service.dispatch('sess-1', 'message.received', {});
 
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    // ── chatFilter (per-webhook contact/group allowlist) ─────────────
+    const mockHook = (data: Record<string, unknown>): void => {
+      (hookManager.execute as jest.Mock).mockResolvedValue({
+        continue: true,
+        data: {
+          sessionId: 'sess-1',
+          event: 'message.received',
+          payload: {
+            event: 'message.received',
+            timestamp: '',
+            sessionId: 'sess-1',
+            idempotencyKey: '',
+            deliveryId: '',
+            data,
+          },
+        },
+      });
+    };
+
+    it('should deliver when message.from is in chatFilter', async () => {
+      const webhook = createMockWebhook({ chatFilter: ['628A@c.us', '120363B@g.us'] });
+      (repository.find as jest.Mock).mockResolvedValue([webhook]);
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      mockHook({ from: '628A@c.us' });
+
+      await service.dispatch('sess-1', 'message.received', { from: '628A@c.us' });
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should deliver group message when group id (from) is in chatFilter', async () => {
+      const webhook = createMockWebhook({ chatFilter: ['120363B@g.us'] });
+      (repository.find as jest.Mock).mockResolvedValue([webhook]);
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      mockHook({ from: '120363B@g.us', author: '628X@c.us' });
+
+      await service.dispatch('sess-1', 'message.received', { from: '120363B@g.us', author: '628X@c.us' });
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should deliver when message.author matches even if from does not', async () => {
+      const webhook = createMockWebhook({ chatFilter: ['628X@c.us'] });
+      (repository.find as jest.Mock).mockResolvedValue([webhook]);
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      mockHook({ from: '120363B@g.us', author: '628X@c.us' });
+
+      await service.dispatch('sess-1', 'message.received', { from: '120363B@g.us', author: '628X@c.us' });
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should NOT deliver when neither from nor author is in chatFilter', async () => {
+      const webhook = createMockWebhook({ chatFilter: ['628A@c.us'] });
+      (repository.find as jest.Mock).mockResolvedValue([webhook]);
+      mockHook({ from: '628C@c.us' });
+
+      await service.dispatch('sess-1', 'message.received', { from: '628C@c.us' });
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should ignore chatFilter for non-message events', async () => {
+      const webhook = createMockWebhook({ events: ['*'], chatFilter: ['628A@c.us'] });
+      (repository.find as jest.Mock).mockResolvedValue([webhook]);
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      (hookManager.execute as jest.Mock).mockResolvedValue({
+        continue: true,
+        data: {
+          sessionId: 'sess-1',
+          event: 'session.status',
+          payload: {
+            event: 'session.status',
+            timestamp: '',
+            sessionId: 'sess-1',
+            idempotencyKey: '',
+            deliveryId: '',
+            data: {},
+          },
+        },
+      });
+
+      await service.dispatch('sess-1', 'session.status', { status: 'connected' });
+
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should deliver to all chats when chatFilter is empty/null', async () => {
+      const webhook = createMockWebhook({ chatFilter: null });
+      (repository.find as jest.Mock).mockResolvedValue([webhook]);
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      mockHook({ from: '628ANY@c.us' });
+
+      await service.dispatch('sess-1', 'message.received', { from: '628ANY@c.us' });
+
+      expect(mockFetch).toHaveBeenCalled();
     });
   });
 

@@ -248,6 +248,12 @@
     "events": "אירועים",
     "available": "אירועים זמינים",
     "saveChanges": "שמירת שינויים",
+    "chatFilter": "סינון צ'אטים",
+    "chatFilterHint": "שלח אירועי הודעות רק מאנשי הקשר או הקבוצות האלה. השאר ריק כדי לקבל מכל הצ'אטים.",
+    "chatFilterPlaceholder": "לדוגמה 628123456789@c.us או 12036…@g.us",
+    "chatFilterAdd": "הוסף",
+    "chatFilterRemove": "הסר {{id}}",
+    "chatFilterEmpty": "אין סינון — מקבל מכל הצ'אטים.",
     "columns": {
       "url": "כתובת URL",
       "events": "אירועים",

@@ -124,8 +124,13 @@ export function useWebhooksQuery() {
 export function useCreateWebhookMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: { sessionId: string; url: string; events: string[]; secret?: string }) =>
-      webhookApi.create(params.sessionId, { url: params.url, events: params.events, secret: params.secret }),
+    mutationFn: (params: { sessionId: string; url: string; events: string[]; secret?: string; chatFilter?: string[] }) =>
+      webhookApi.create(params.sessionId, {
+        url: params.url,
+        events: params.events,
+        secret: params.secret,
+        chatFilter: params.chatFilter,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.webhooks });
     },

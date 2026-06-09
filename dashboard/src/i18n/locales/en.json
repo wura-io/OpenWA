@@ -248,6 +248,12 @@
     "events": "Events",
     "available": "Available Events",
     "saveChanges": "Save Changes",
+    "chatFilter": "Chat filter",
+    "chatFilterHint": "Only deliver message events from these contacts or groups. Leave empty to receive from all chats.",
+    "chatFilterPlaceholder": "e.g. 628123456789@c.us or 12036…@g.us",
+    "chatFilterAdd": "Add",
+    "chatFilterRemove": "Remove {{id}}",
+    "chatFilterEmpty": "No filter — receiving from all chats.",
     "columns": {
       "url": "URL",
       "events": "Events",

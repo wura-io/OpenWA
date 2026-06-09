@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Copy,
+  Filter,
 } from 'lucide-react';
 import { webhookApi, type Webhook } from '../services/api';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -43,6 +44,66 @@ const maskSecret = (secret: string) => {
   return `${secret.slice(0, 10)}${'•'.repeat(Math.min(secret.length - 10, 24))}`;
 };
 
+// Chip input for the per-webhook contact/group allowlist. Empty list = receive
+// from all chats; ids are added on Enter or the Add button and deduplicated.
+function ChatFilterInput({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState('');
+
+  const addId = () => {
+    const id = draft.trim();
+    if (!id || value.includes(id)) {
+      setDraft('');
+      return;
+    }
+    onChange([...value, id]);
+    setDraft('');
+  };
+
+  const removeId = (id: string) => onChange(value.filter(v => v !== id));
+
+  return (
+    <>
+      <label>{t('webhooks.chatFilter')}</label>
+      <div className="chat-filter-input-row">
+        <input
+          type="text"
+          placeholder={t('webhooks.chatFilterPlaceholder')}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addId();
+            }
+          }}
+        />
+        <button type="button" className="btn-secondary" onClick={addId} disabled={!draft.trim()}>
+          <Plus size={16} />
+          {t('webhooks.chatFilterAdd')}
+        </button>
+      </div>
+      {value.length > 0 ? (
+        <div className="chat-filter-chips">
+          {value.map(id => (
+            <span key={id} className="chat-filter-chip">
+              <code>{id}</code>
+              <button type="button" aria-label={t('webhooks.chatFilterRemove', { id })} onClick={() => removeId(id)}>
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="chat-filter-empty">{t('webhooks.chatFilterEmpty')}</p>
+      )}
+      <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>
+        {t('webhooks.chatFilterHint')}
+      </p>
+    </>
+  );
+}
+
 export function Webhooks() {
   const { t } = useTranslation();
   useDocumentTitle(t('webhooks.title'));
@@ -59,7 +120,13 @@ export function Webhooks() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ sessionId: string; id: string; url: string } | null>(null);
   const [editWebhook, setEditWebhook] = useState<Webhook | null>(null);
-  const [newWebhook, setNewWebhook] = useState({ url: '', events: ['message.received'], sessionId: '', secret: '' });
+  const [newWebhook, setNewWebhook] = useState({
+    url: '',
+    events: ['message.received'],
+    sessionId: '',
+    secret: '',
+    chatFilter: [] as string[],
+  });
   const [secretCopied, setSecretCopied] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -85,9 +152,11 @@ export function Webhooks() {
         events: newWebhook.events,
         // Only send a secret when provided; empty string leaves it unset.
         ...(newWebhook.secret ? { secret: newWebhook.secret } : {}),
+        // Only send a filter when there is at least one id; empty = receive all.
+        ...(newWebhook.chatFilter.length ? { chatFilter: newWebhook.chatFilter } : {}),
       });
       setShowCreateModal(false);
-      setNewWebhook({ url: '', events: ['message.received'], sessionId: '', secret: '' });
+      setNewWebhook({ url: '', events: ['message.received'], sessionId: '', secret: '', chatFilter: [] });
       setToast({ type: 'success', message: t('webhooks.toasts.created') });
     } catch (err) {
       setToast({
@@ -168,6 +237,8 @@ export function Webhooks() {
           url: editWebhook.url,
           events: editWebhook.events,
           active: editWebhook.active,
+          // Send [] to clear the filter (receive from all chats) or the current ids.
+          chatFilter: editWebhook.chatFilter ?? [],
           // Secret is immutable here — to rotate it, delete and recreate the webhook.
         },
       });
@@ -297,6 +368,10 @@ export function Webhooks() {
                   </button>
                 ))}
               </div>
+              <ChatFilterInput
+                value={newWebhook.chatFilter}
+                onChange={chatFilter => setNewWebhook({ ...newWebhook, chatFilter })}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>
@@ -369,6 +444,10 @@ export function Webhooks() {
                   </button>
                 ))}
               </div>
+              <ChatFilterInput
+                value={editWebhook.chatFilter ?? []}
+                onChange={chatFilter => setEditWebhook({ ...editWebhook, chatFilter })}
+              />
               <div className="toggle-group">
                 <span className="toggle-label">{t('common.status')}</span>
                 <label className="toggle-switch">
@@ -462,6 +541,15 @@ export function Webhooks() {
                         {event}
                       </span>
                     ))}
+                    {webhook.chatFilter && webhook.chatFilter.length > 0 && (
+                      <span
+                        className="event-tag chat-filter-count"
+                        title={webhook.chatFilter.join(', ')}
+                      >
+                        <Filter size={11} />
+                        {webhook.chatFilter.length}
+                      </span>
+                    )}
                   </span>
                   <span>
                     {sessions.find(s => s.id === webhook.sessionId)?.name || webhook.sessionId.substring(0, 8)}

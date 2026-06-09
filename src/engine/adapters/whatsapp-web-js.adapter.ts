@@ -148,6 +148,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
         const incomingMessage: IncomingMessage = {
           id: msg.id._serialized,
           from: msg.from,
+          author: msg.author || undefined,
           to: msg.to,
           chatId: msg.from,
           body: msg.body,
