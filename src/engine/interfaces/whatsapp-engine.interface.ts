@@ -60,6 +60,32 @@ export interface Group {
   isAdmin?: boolean;
 }
 
+/**
+ * Thrown when an engine read fails because WhatsApp Web is still performing its
+ * initial history sync (the in-page Store is not ready yet, or the call hangs).
+ * Controllers should map this to HTTP 503 so clients can retry.
+ */
+export class EngineSyncingError extends Error {
+  constructor(message = 'WhatsApp is still syncing. Please try again shortly.') {
+    super(message);
+    this.name = 'EngineSyncingError';
+  }
+}
+
+export type ChatType = 'individual' | 'group' | 'community' | 'channel';
+
+export interface ChatSummary {
+  id: string; // _serialized, e.g. 120363xxx@g.us / 628xxx@c.us / xxx@newsletter
+  name: string;
+  type: ChatType;
+  isGroup: boolean;
+  unreadCount?: number;
+  timestamp?: number; // last activity ts
+  participantsCount?: number; // groups/communities only
+  archived?: boolean;
+  isReadOnly?: boolean;
+}
+
 export interface GroupParticipant {
   id: string;
   number: string;
@@ -240,6 +266,9 @@ export interface IWhatsAppEngine {
   getContacts(): Promise<Contact[]>;
   getContactById(contactId: string): Promise<Contact | null>;
   checkNumberExists(number: string): Promise<boolean>;
+
+  // Chats - unified listing (individual + group + community + channel)
+  getChats(): Promise<ChatSummary[]>;
 
   // Groups - Basic
   getGroups(): Promise<Group[]>;

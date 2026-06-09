@@ -56,6 +56,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "sessions": "Sessions",
+    "conversations": "Conversations",
     "webhooks": "Webhooks",
     "apiKeys": "API Keys",
     "messageTester": "Message Tester",
@@ -192,6 +193,46 @@
       "phone": "Phone",
       "sessionId": "Session ID",
       "lastActive": "Last Active"
+    }
+  },
+  "conversations": {
+    "title": "Conversations",
+    "subtitle": "Browse every chat, group, community and channel for a session and copy its ID.",
+    "session": "Session",
+    "noSessions": "No sessions available",
+    "copyId": "Copy ID",
+    "unnamed": "(no name)",
+    "retry": "Retry",
+    "communityNote": "Community detection is best-effort; some communities may appear as groups.",
+    "syncing": {
+      "title": "WhatsApp is still syncing",
+      "description": "Chats become available once WhatsApp finishes syncing. Retrying automatically…"
+    },
+    "types": {
+      "all": "All",
+      "individual": "Individual",
+      "group": "Group",
+      "community": "Community",
+      "channel": "Channel"
+    },
+    "typeDescriptions": {
+      "individual": "One-to-one direct chat with a contact.",
+      "group": "Multi-participant group chat.",
+      "community": "Parent group linking related groups (best-effort).",
+      "channel": "Broadcast channel / newsletter you follow."
+    },
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "id": "ID",
+      "participants": "Participants",
+      "unread": "Unread"
+    },
+    "empty": {
+      "title": "No chats found",
+      "description": "This session has no chats of the selected type.",
+      "noSession": "Select a started session to view its chats.",
+      "error": "Failed to load chats"
     }
   },
   "webhooks": {

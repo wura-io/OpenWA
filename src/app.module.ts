@@ -18,6 +18,7 @@ import { InfraModule } from './modules/infra/infra.module';
 import { EventsModule } from './modules/events/events.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { GroupModule } from './modules/group/group.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { LabelModule } from './modules/label/label.module';
 import { ChannelModule } from './modules/channel/channel.module';
 import { CacheModule } from './common/cache';
@@ -174,6 +175,7 @@ if (process.env.NODE_ENV === 'production') {
     InfraModule,
     ContactModule,
     GroupModule,
+    ChatModule, // Unified chat listing (conversations/groups/communities/channels)
     LabelModule, // Phase 3: Labels Management
     ChannelModule, // Phase 3: Channels/Newsletter
     StatsModule, // Phase 3: Statistics Dashboard

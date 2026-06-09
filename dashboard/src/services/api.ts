@@ -18,6 +18,20 @@ export interface Session {
   updatedAt: string;
 }
 
+export type ChatType = 'individual' | 'group' | 'community' | 'channel';
+
+export interface ChatSummary {
+  id: string;
+  name: string;
+  type: ChatType;
+  isGroup: boolean;
+  unreadCount?: number;
+  timestamp?: number;
+  participantsCount?: number;
+  archived?: boolean;
+  isReadOnly?: boolean;
+}
+
 export interface SessionStats {
   total: number;
   active: number;
@@ -145,6 +159,27 @@ export interface Settings {
 // API Client
 // =============================================================================
 
+// Default request timeout. Without this a hung backend call (e.g. while
+// WhatsApp is still syncing and an engine read never resolves) would leave the
+// UI spinning forever.
+const REQUEST_TIMEOUT_MS = 20_000;
+
+/** Error carrying the HTTP status so callers can branch (e.g. 503 = syncing). */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** True when the failure means WhatsApp is still syncing and a retry may succeed. */
+export function isSyncingError(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 503 || error.status === 408);
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -157,11 +192,24 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     ...options.headers,
   };
 
-  const response = await fetch(url, { ...options, headers });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    // AbortSignal.timeout fires a TimeoutError; surface it as a retryable 408.
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      throw new ApiError(408, 'Request timed out — the server may still be syncing');
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(error.message || `HTTP ${response.status}`);
+    throw new ApiError(response.status, error.message || `HTTP ${response.status}`);
   }
 
   if (response.status === 204) {
@@ -189,6 +237,8 @@ export const sessionApi = {
   getQR: (id: string) => request<{ qrCode: string; status: string }>(`/sessions/${id}/qr`),
   getStats: () => request<SessionStats>('/sessions/stats/overview'),
   getGroups: (id: string) => request<{ id: string; name: string }[]>(`/sessions/${id}/groups`),
+  getChats: (id: string, type?: string) =>
+    request<ChatSummary[]>(`/sessions/${id}/chats${type ? `?type=${type}` : ''}`),
 };
 
 // =============================================================================

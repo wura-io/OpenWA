@@ -10,6 +10,8 @@ import {
   MediaInput,
   IncomingMessage,
   Contact,
+  ChatSummary,
+  EngineSyncingError,
   Group,
   GroupInfo,
   GroupParticipant,
@@ -378,6 +380,94 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
         ),
       };
     });
+  }
+
+  /**
+   * Races a promise against a timeout. Used to guard puppeteer-backed reads that
+   * can hang while WhatsApp Web is still syncing (the page never resolves).
+   * Note: the underlying call keeps running; we only stop awaiting it.
+   */
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new EngineSyncingError(`${label} timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  }
+
+  async getChats(): Promise<ChatSummary[]> {
+    this.ensureReady();
+
+    // Source 1: getChats() returns individual + group chats (NOT channels).
+    // Guard with a timeout: during the initial history sync this call can hang
+    // or throw because the in-page Store isn't ready yet. Surface that as a
+    // retryable "still syncing" signal instead of hanging the HTTP request.
+    let chats: Awaited<ReturnType<Client['getChats']>>;
+    try {
+      chats = await this.withTimeout(this.client!.getChats(), 12_000, 'getChats');
+    } catch (error) {
+      const message = String(error);
+      if (error instanceof EngineSyncingError || message.includes('Cannot read properties of undefined')) {
+        throw new EngineSyncingError();
+      }
+      throw error;
+    }
+    const chatSummaries: ChatSummary[] = chats.map(chat => {
+      let type: ChatSummary['type'] = 'individual';
+      let participantsCount: number | undefined;
+
+      if (chat.isGroup) {
+        const groupChat = chat as unknown as GroupChat;
+        participantsCount = groupChat.participants?.length;
+        // Best-effort community detection: whatsapp-web.js has no documented
+        // community API. Communities are "parent groups" exposed only via the
+        // internal groupMetadata flag, which may be absent -> falls back to 'group'.
+        const meta = (chat as unknown as { groupMetadata?: { isParentGroup?: boolean } }).groupMetadata;
+        type = meta?.isParentGroup ? 'community' : 'group';
+      }
+
+      return {
+        id: chat.id._serialized,
+        name: chat.name,
+        type,
+        isGroup: chat.isGroup,
+        unreadCount: chat.unreadCount,
+        timestamp: chat.timestamp,
+        participantsCount,
+        archived: chat.archived,
+        isReadOnly: chat.isReadOnly,
+      };
+    });
+
+    // Source 2: channels are fetched separately (getChats omits them).
+    try {
+      const channels = await this.withTimeout(
+        (this.client as unknown as BusinessClient).getChannels(),
+        8_000,
+        'getChannels',
+      );
+      for (const ch of channels || []) {
+        const channel = ch as WwjsChannelData & {
+          unreadCount?: number;
+          timestamp?: number;
+          isReadOnly?: boolean;
+        };
+        chatSummaries.push({
+          id: String(typeof channel.id === 'object' ? channel.id._serialized : channel.id),
+          name: String(channel.name || ''),
+          type: 'channel',
+          isGroup: false,
+          unreadCount: channel.unreadCount,
+          timestamp: channel.timestamp,
+          isReadOnly: channel.isReadOnly,
+        });
+      }
+    } catch (error) {
+      // Channels are a best-effort addition; never fail the whole listing.
+      this.logger.warn('Failed to fetch channels for chat listing', String(error));
+    }
+
+    return chatSummaries;
   }
 
   // ============= Phase 3: Extended Messaging =============

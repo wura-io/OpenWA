@@ -6,6 +6,7 @@ import {
   auditApi,
   infraApi,
   pluginsApi,
+  isSyncingError,
   type Webhook,
 } from '../services/api';
 
@@ -15,6 +16,8 @@ export const queryKeys = {
   sessions: ['sessions'] as const,
   sessionStats: ['sessions', 'stats'] as const,
   sessionGroups: (sessionId: string) => ['sessions', sessionId, 'groups'] as const,
+  sessionChats: (sessionId: string, type?: string) =>
+    ['sessions', sessionId, 'chats', type ?? 'all'] as const,
   webhooks: ['webhooks'] as const,
   apiKeys: ['apiKeys'] as const,
   logs: (params: { severity?: string; page: number; limit: number }) =>
@@ -49,6 +52,20 @@ export function useSessionGroupsQuery(sessionId: string, enabled: boolean) {
     queryFn: () => sessionApi.getGroups(sessionId),
     enabled: enabled && !!sessionId,
     staleTime: 60_000,
+  });
+}
+
+export function useSessionChatsQuery(sessionId: string, type: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.sessionChats(sessionId, type),
+    queryFn: () => sessionApi.getChats(sessionId, type),
+    enabled: enabled && !!sessionId,
+    staleTime: 60_000,
+    // While WhatsApp is still syncing the backend returns 503/timeout. Keep
+    // retrying so the list fills in automatically once sync completes; fail
+    // fast on any other error.
+    retry: (failureCount, error) => isSyncingError(error) && failureCount < 10,
+    retryDelay: 3_000,
   });
 }
 
