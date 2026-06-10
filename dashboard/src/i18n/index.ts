@@ -13,11 +13,16 @@ void i18n
   .init({
     resources: {
       'pt-BR': { translation: ptBR },
+      // Alias so a bare `pt` from the browser/navigator resolves to PT-BR too.
+      pt: { translation: ptBR },
       en: { translation: en },
     },
     fallbackLng: 'en',
-    supportedLngs: supportedLanguages as unknown as string[],
-    nonExplicitSupportedLngs: true,
+    // Region codes in supportedLngs + the default load:'all' make i18next
+    // expand `pt-BR` -> `pt` and reject the match, silently falling back to en.
+    // `currentOnly` loads exactly the resolved code, so `pt-BR` stays `pt-BR`.
+    supportedLngs: ['pt-BR', 'pt', 'en'],
+    load: 'currentOnly',
     interpolation: { escapeValue: false },
     detection: {
       order: ['localStorage', 'navigator'],
