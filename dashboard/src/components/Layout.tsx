@@ -81,14 +81,15 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
   const toggleMobile = () => setIsMobileOpen(!isMobileOpen);
 
-  const currentLang = (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0] as SupportedLanguage;
+  const resolvedLang = (i18n.resolvedLanguage || i18n.language || 'en').toLowerCase();
+  const currentLang: SupportedLanguage = resolvedLang.startsWith('pt') ? 'pt-BR' : 'en';
   const cycleLanguage = () => {
     const idx = supportedLanguages.indexOf(currentLang);
     const next = supportedLanguages[(idx + 1) % supportedLanguages.length];
     void i18n.changeLanguage(next);
   };
-  const languageLabel = currentLang === 'he' ? 'עברית' : 'EN';
-  const isRtl = currentLang === 'he';
+  const languageLabel = currentLang === 'pt-BR' ? 'PT' : 'EN';
+  const isRtl = false;
 
   return (
     <div className="layout">

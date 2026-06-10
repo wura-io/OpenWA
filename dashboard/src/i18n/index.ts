@@ -1,21 +1,19 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
+import ptBR from './locales/pt-BR.json';
 import en from './locales/en.json';
-import he from './locales/he.json';
 
-export const supportedLanguages = ['en', 'he'] as const;
+export const supportedLanguages = ['pt-BR', 'en'] as const;
 export type SupportedLanguage = (typeof supportedLanguages)[number];
-
-export const rtlLanguages: SupportedLanguage[] = ['he'];
 
 void i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources: {
+      'pt-BR': { translation: ptBR },
       en: { translation: en },
-      he: { translation: he },
     },
     fallbackLng: 'en',
     supportedLngs: supportedLanguages as unknown as string[],
@@ -30,11 +28,10 @@ void i18n
   });
 
 function applyDirection(lang: string) {
-  const base = (lang || 'en').split('-')[0] as SupportedLanguage;
-  const dir = rtlLanguages.includes(base) ? 'rtl' : 'ltr';
+  const base = (lang || 'en').split('-')[0];
   if (typeof document !== 'undefined') {
     document.documentElement.lang = base;
-    document.documentElement.dir = dir;
+    document.documentElement.dir = 'ltr';
   }
 }
 
